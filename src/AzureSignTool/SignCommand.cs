@@ -10,11 +10,12 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
-
+using AzureSign.Core.Interop;
 using static AzureSignTool.HRESULT;
 
 namespace AzureSignTool
@@ -218,6 +219,13 @@ namespace AzureSignTool
             {
                 var logger = loggerFactory.CreateLogger<SignCommand>();
                 X509Certificate2Collection certificates;
+
+                var directoryName = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+                if (directoryName != null)
+                {
+                    kernel32.AddDllDirectory(directoryName);
+                }
 
                 switch (GetAdditionalCertificates(AdditionalCertificates, logger))
                 {
