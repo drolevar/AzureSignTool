@@ -4,6 +4,7 @@ using Azure.Security.KeyVault.Certificates;
 
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
@@ -28,6 +29,41 @@ namespace AzureSignTool
             else if(!string.IsNullOrWhiteSpace(configuration.AzureAccessToken))
             {
                 credential = new AccessTokenCredential(configuration.AzureAccessToken);
+            }
+            else if (!string.IsNullOrWhiteSpace(configuration.AzureClientCertificateThumbprint))
+            {
+                try
+                {
+                    X509Certificate2 authCert;
+
+                    using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+                    {
+                        store.Open(OpenFlags.ReadOnly);
+                        authCert = store.Certificates.FirstOrDefault(cert => string.Equals(cert.Thumbprint, configuration.AzureClientCertificateThumbprint, StringComparison.OrdinalIgnoreCase));
+                    }
+
+                    if (authCert == null)
+                    {
+                        using (var store = new X509Store(StoreName.My, StoreLocation.LocalMachine))
+                        {
+                            store.Open(OpenFlags.ReadOnly);
+                            authCert = store.Certificates.FirstOrDefault(cert => string.Equals(cert.Thumbprint, configuration.AzureClientCertificateThumbprint, StringComparison.OrdinalIgnoreCase));
+                        }
+                    }
+
+                    if (authCert == null)
+                    {
+                        throw new InvalidOperationException($"Failed to locate a personal certificate with hash {configuration.AzureClientCertificateThumbprint}. Please verify the thumbprint of the certificate.");
+                    }
+
+                    credential = new ClientCertificateCredential(configuration.AzureTenantId, configuration.AzureClientId, authCert);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e.Message);
+
+                    return e;
+                }
             }
             else
             {

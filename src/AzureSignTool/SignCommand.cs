@@ -30,6 +30,9 @@ namespace AzureSignTool
         [Option("-kvs | --azure-key-vault-client-secret", "The Client Secret to authenticate to the Azure Key Vault.", CommandOptionType.SingleValue)]
         public (bool Present, string Value) KeyVaultClientSecret { get; set; }
 
+        [Option("-kvct | --azure-key-vault-client-cert-thumbprint", "The Client Certificate Thumbprint to authenticate to the Azure Key Vault.", CommandOptionType.SingleValue)]
+        public (bool Present, string Value) KeyVaultClientCertificateThumbprint { get; set; }
+
         [Option("-kvt | --azure-key-vault-tenant-id", "The Tenant Id to authenticate to the Azure Key Vault.", CommandOptionType.SingleValue)]
         public (bool Present, string Value) KeyVaultTenantId { get; set; }
 
@@ -138,10 +141,12 @@ namespace AzureSignTool
             {
                 return new ValidationResult("Cannot use '--page-hashing' and '--no-page-hashing' options together.", new[] { nameof(NoPageHashing), nameof(PageHashing) });
             }
+
             if (Quiet && Verbose)
             {
                 return new ValidationResult("Cannot use '--quiet' and '--verbose' options together.", new[] { nameof(Quiet), nameof(Verbose) });
             }
+
             if (!OneTrue(KeyVaultAccessToken.Present, KeyVaultClientId.Present, UseManagedIdentity))
             {
                 return new ValidationResult("One of '--azure-key-vault-accesstoken', '--azure-key-vault-client-id' or '--azure-key-vault-managed-identity' must be supplied.", new[] { nameof(KeyVaultAccessToken), nameof(KeyVaultClientId) });
@@ -152,23 +157,31 @@ namespace AzureSignTool
                 return new ValidationResult("Cannot use '--timestamp-rfc3161' and '--timestamp-authenticode' options together.", new[] { nameof(Rfc3161Timestamp), nameof(AuthenticodeTimestamp) });
             }
 
-            if (KeyVaultClientId.Present && !KeyVaultClientSecret.Present)
+            if (KeyVaultClientId.Present && !KeyVaultClientSecret.Present && !KeyVaultClientCertificateThumbprint.Present)
             {
-                return new ValidationResult("Must supply '--azure-key-vault-client-secret' when using '--azure-key-vault-client-id'.", new[] { nameof(KeyVaultClientSecret) });
+                return new ValidationResult("Must supply '--azure-key-vault-client-secret' or '--azure-key-vault-client-cert-thumbprint' when using '--azure-key-vault-client-id'.", new[] { nameof(KeyVaultClientSecret), nameof(KeyVaultClientCertificateThumbprint) });
             }
 
             if (KeyVaultClientId.Present && !KeyVaultTenantId.Present)
             {
                 return new ValidationResult("Must supply '--azure-key-vault-tenant-id' when using '--azure-key-vault-client-id'.", new[] { nameof(KeyVaultTenantId) });
             }
+
+            if (KeyVaultClientSecret.Present && KeyVaultClientCertificateThumbprint.Present)
+            {
+                return new ValidationResult("Cannot use '--azure-key-vault-client-secret' and '--azure-key-vault-client-cert-thumbprint' options together.", new[] { nameof(KeyVaultClientSecret), nameof(KeyVaultClientCertificateThumbprint) });
+            }
+
             if (UseManagedIdentity && (KeyVaultAccessToken.Present || KeyVaultClientId.Present))
             {
                 return new ValidationResult("Cannot use '--azure-key-vault-managed-identity' and '--azure-key-vault-accesstoken' or '--azure-key-vault-client-id'", new[] { nameof(UseManagedIdentity) });
             }
+
             if (AllFiles.Count == 0)
             {
                 return new ValidationResult("At least one file must be specified to sign.");
             }
+
             foreach(var file in AllFiles)
             {
                 if (!File.Exists(file))
@@ -176,6 +189,7 @@ namespace AzureSignTool
                     return new ValidationResult($"File '{file}' does not exist.");
                 }
             }
+
             return ValidationResult.Success;
         }
 
@@ -226,6 +240,7 @@ namespace AzureSignTool
                     AzureTenantId = KeyVaultTenantId.Value,
                     AzureAccessToken = KeyVaultAccessToken.Value,
                     AzureClientSecret = KeyVaultClientSecret.Value,
+                    AzureClientCertificateThumbprint = KeyVaultClientCertificateThumbprint.Value,
                     ManagedIdentity = UseManagedIdentity,
                 };
 
