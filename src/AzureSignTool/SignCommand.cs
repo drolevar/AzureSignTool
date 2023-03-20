@@ -74,6 +74,9 @@ namespace AzureSignTool
         [Option("-ac | --additional-certificates", "Specify one or more certificates to include in the public certificate chain.", CommandOptionType.MultipleValue), FileExists]
         public string[] AdditionalCertificates { get; set; } = Array.Empty<string>();
 
+        [Option("-as | --append-signature", "Appends this signature. If no primary signature is present, this signature is made the primary signature instead.", CommandOptionType.NoValue)]
+        public bool AppendSignature { get; set; }
+
         [Option("-v | --verbose", "Include additional output.", CommandOptionType.NoValue)]
         public bool Verbose { get; set; }
 
@@ -191,6 +194,11 @@ namespace AzureSignTool
             if (UseManagedIdentity && (KeyVaultAccessToken.Present || KeyVaultClientId.Present))
             {
                 return new ValidationResult("Cannot use '--azure-key-vault-managed-identity' and '--azure-key-vault-accesstoken' or '--azure-key-vault-client-id'", new[] { nameof(UseManagedIdentity) });
+            }
+
+            if (AuthenticodeTimestamp.Present && AppendSignature)
+            {
+                return new ValidationResult("Cannot append signature when using Authenticode stamping", new[] { nameof(AuthenticodeTimestamp), nameof(AppendSignature) });
             }
 
             if (AllFiles.Count == 0)
@@ -337,7 +345,7 @@ namespace AzureSignTool
                                 return (state.succeeded + 1, state.failed);
                             }
 
-                            var result = signer.SignFile(filePath, Description, DescriptionUri, performPageHashing, logger);
+                            var result = signer.SignFile(filePath, Description, DescriptionUri, performPageHashing, AppendSignature, logger);
                             switch (result)
                             {
                                 case COR_E_BADIMAGEFORMAT:
